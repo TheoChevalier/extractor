@@ -14,8 +14,7 @@ include __DIR__ . '/../inc/init.php';
 
 $target_repo = GIT . 'en-US';
 $git = new DataMan($target_repo);
-$git->initRepo();
-print($git->repository_path);
+
 $moz_central  = new Mercurial(HG . 'TRUNK_EN-US/mozilla-central');
 $comm_central = new Mercurial(HG . 'TRUNK_EN-US/comm-central');
 
@@ -51,52 +50,46 @@ ksort($data['merged']);
 foreach ($data['merged'] as $commit) {
     $l10n_has_changed = false;
     $rev = explode(':', $commit['commit'])[1];
+
     switch($commit['repo']) {
         case 'cc':
-            $changes = $comm_central->getChangedFiles($rev);
-
-            foreach ($changes as $change) {
-                if (! Strings::startsWith($change['path'], $dirs_reference)
-                 || ! Strings::endsWith($change['path'], $ext_reference)) {
-                    continue;
-                }
-
-                // We have at least one file change, let’s update code repo
-                $comm_central->updateRev($rev);
-                $l10n_has_changed = true;
-
-                $target_path = $target_repo . '/' . $change['path'];
-
-                switch($change['type']) {
-                    case 'A':
-                        Files::fileForceContents(
-                            $target_path,
-                            file_get_contents($comm_central->repository_path . '/' . $change['path'])
-                        );
-                        break;
-                    case 'M':
-                        Files::fileForceContents(
-                            $target_path,
-                            file_get_contents($comm_central->repository_path . '/' . $change['path'])
-                        );
-
-                        break;
-                    case 'R':
-                        unlink($target_path);
-                        break;
-                }
-                //print_r($change);
-            }
+            $vcs = $comm_central;
             break;
         case 'mc':
+            $vcs = $moz_central;
             break;
+    }
+    $changes = $vcs->getChangedFiles($rev);
+
+    foreach ($changes as $change) {
+        if (! Strings::startsWith($change['path'], $dirs_reference)
+         || ! Strings::endsWith($change['path'], $ext_reference)) {
+            continue;
+        }
+
+        // We have at least one file change, let’s update code repo
+        $vcs->updateRev($rev);
+        $l10n_has_changed = true;
+
+        $target_path = $target_repo . '/' . $change['path'];
+
+        switch($change['type']) {
+            case 'A':
+            case 'M':
+                Files::fileForceContents(
+                    $target_path,
+                    file_get_contents($vcs->repository_path . '/' . $change['path'])
+                );
+
+                break;
+            case 'R':
+                unlink($target_path);
+                break;
+        }
     }
 
     // If this commit has l10n changes, record it
     if ($l10n_has_changed) {
         $git->commit($commit['summary']);
     }
-    //print_r($changes);
 }
-
-//print(print_r($data['merged']));

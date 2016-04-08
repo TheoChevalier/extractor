@@ -14,11 +14,8 @@ use Monolog\Logger;
  */
 class DataMan extends \VCS\Git {
 
-    public function authenticate($login, $password) {
-        return true;
-    }
-
-    public function initRepo() {
+    public function __construct($path) {
+        parent::__construct($path);
         // We use the Monolog library to log our events
         $this->logger = new Logger('DataManager');
         $this->logger->pushHandler(new StreamHandler(INSTALL_ROOT . 'logs/repo-errors.log'));
@@ -34,6 +31,11 @@ class DataMan extends \VCS\Git {
                                  . $e->getMessage());
         }
     }
+
+    public function authenticate($login, $password) {
+        return true;
+    }
+
     public function commit($commit_msg)
     {
         try {
