@@ -1,0 +1,34 @@
+{
+  "1": {
+    "id": "release",
+    "name": "Release"
+  },
+  "2": {
+    "id": "beta",
+    "name": "Beta"
+  },
+  "3": {
+    "id": "aurora",
+    "name": "Aurora"
+  },
+  "4": {
+    "id": "central",
+    "name": "Central"
+  },
+  "5": {
+    "id": "gaia_2_0",
+    "name": "Gaia 2.0"
+  },
+  "6": {
+    "id": "gaia_2_1",
+    "name": "Gaia 2.1"
+  },
+  "7": {
+    "id": "gaia",
+    "name": "Gaia Master"
+  },
+  "8": {
+    "id": "mozilla_org",
+    "name": "mozilla.org"
+  }
+}

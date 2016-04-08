@@ -1,0 +1,26 @@
+sudo: false
+language: php
+php:
+  - 5.4
+  - 5.5
+before_script:
+  ## Composer
+  - composer self-update
+  - composer install --no-interaction --prefer-source
+  ## travis configuration
+  - cp app/config/config.ini-travis app/config/config.ini
+script:
+  - vendor/atoum/atoum/bin/atoum -d tests/units/
+  - php tests/functional/api.php
+  - vendor/bin/php-cs-fixer --diff --dry-run -v fix
+notifications:
+  irc:
+    channels:
+      - "irc.mozilla.org#transvision"
+    on_success: always
+    on_failure: always
+    use_notice: true
+    skip_join: true
+    template:
+      - "%{repository} ; %{commit} (%{author}) : %{message} "
+      - "Build details: %{build_url} ; changes: %{compare_url}"

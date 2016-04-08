@@ -1,0 +1,102 @@
+#!/usr/bin/env php
+<?php
+namespace Transvision;
+
+use VCS\Git;
+use VCS\Mercurial;
+
+
+if (php_sapi_name() != 'cli') {
+    die('This command can only be used in CLI mode.');
+}
+
+include __DIR__ . '/../inc/init.php';
+
+$target_repo = GIT . 'en-US';
+$git = new DataMan($target_repo);
+$git->initRepo();
+print($git->repository_path);
+$moz_central  = new Mercurial(HG . 'TRUNK_EN-US/mozilla-central');
+$comm_central = new Mercurial(HG . 'TRUNK_EN-US/comm-central');
+
+
+//$data['mc'] = array_slice($moz_central->getCommits(), 0, 200);
+$data['cc'] = $comm_central->getCommits();
+
+$data['merged'] = [];
+$dirs_reference = [
+    'browser', 'calendar', 'chat', 'devtools', 'dom', 'editor',
+    'extensions', 'mail', 'mobile', 'netwerk', 'other-licenses',
+    'security', 'services', 'suite', 'toolkit', 'webapprt'
+];
+
+$ext_reference = [
+    'dtd', 'properties', 'ini', 'inc'
+];
+
+foreach ($data['cc'] as $commit) {
+    $timestamp = $commit['date']->getTimestamp();
+
+    // Handle edge case where two pushes occured at very same timestamp
+    while(isset($data['merged'][$timestamp])) {
+        $timestamp++;
+    }
+    $commit['repo'] = 'cc';
+    $data['merged'][$timestamp] = $commit;
+}
+
+unset($data['mc'], $data['cc']);
+ksort($data['merged']);
+
+foreach ($data['merged'] as $commit) {
+    $l10n_has_changed = false;
+    $rev = explode(':', $commit['commit'])[1];
+    switch($commit['repo']) {
+        case 'cc':
+            $changes = $comm_central->getChangedFiles($rev);
+
+            foreach ($changes as $change) {
+                if (! Strings::startsWith($change['path'], $dirs_reference)
+                 || ! Strings::endsWith($change['path'], $ext_reference)) {
+                    continue;
+                }
+
+                // We have at least one file change, let’s update code repo
+                $comm_central->updateRev($rev);
+                $l10n_has_changed = true;
+
+                $target_path = $target_repo . '/' . $change['path'];
+
+                switch($change['type']) {
+                    case 'A':
+                        Files::fileForceContents(
+                            $target_path,
+                            file_get_contents($comm_central->repository_path . '/' . $change['path'])
+                        );
+                        break;
+                    case 'M':
+                        Files::fileForceContents(
+                            $target_path,
+                            file_get_contents($comm_central->repository_path . '/' . $change['path'])
+                        );
+
+                        break;
+                    case 'R':
+                        unlink($target_path);
+                        break;
+                }
+                //print_r($change);
+            }
+            break;
+        case 'mc':
+            break;
+    }
+
+    // If this commit has l10n changes, record it
+    if ($l10n_has_changed) {
+        $git->commit($commit['summary']);
+    }
+    //print_r($changes);
+}
+
+//print(print_r($data['merged']));

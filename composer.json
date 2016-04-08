@@ -1,0 +1,40 @@
+{
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/mozilla-l10n/phpclass-cache"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/mozilla-l10n/phpclass-json"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/pascalchevrel/Verif/"
+        }
+    ],
+
+    "require": {
+        "monolog/monolog" : "~1.1",
+        "mozillal10n/cache": "~0.1",
+        "mozillal10n/json": "~0.1",
+        "pascalc/vcs": "~0.1",
+        "robloach/component-installer": "*",
+        "bit3/git-php": "~1",
+        "knplabs/github-api": "~1.2"
+    },
+
+    "require-dev": {
+        "atoum/atoum" : "~2.0",
+        "symfony/var-dumper": "~2.6",
+        "fabpot/php-cs-fixer": "~1.4",
+        "pchevrel/verif": "0.3"
+    },
+
+    "autoload": {
+        "psr-0": {
+            "Transvision": "app/classes/"
+        },
+        "files": ["app/helpers/debug.php"]
+    }
+}
