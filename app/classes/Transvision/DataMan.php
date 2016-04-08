@@ -26,22 +26,19 @@ class DataMan extends \VCS\Git {
 
         try {
             $this->git = new GitRepository($this->repository_path);
+            $this->git->init()->execute();
         } catch (GitException $e) {
             $this->logger->error('Failed to initialize Git repository. Error: '
                                  . $e->getMessage());
         }
     }
 
-    public function authenticate($login, $password) {
-        return true;
-    }
-
-    public function commit($commit_msg)
+    public function commit($commit_msg, $author, $date)
     {
         try {
             // Add files to git index then commit
             $this->git->add()->all()->execute();
-            $this->git->commit()->message($commit_msg)->execute();
+            $this->git->commit()->message($commit_msg)->author($author)->date($date)->execute();
 
         } catch (GitException $e) {
             $this->logger->error('Failed to commit to Git repository. Error: '
