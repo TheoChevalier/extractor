@@ -12,27 +12,6 @@ if (php_sapi_name() != 'cli') {
 
 include __DIR__ . '/../inc/init.php';
 
-$target_repo = GIT . 'en-US';
-$git = new DataMan($target_repo);
-
-$moz_central  = new Mercurial(HG . 'TRUNK_EN-US/mozilla-central');
-$comm_central = new Mercurial(HG . 'TRUNK_EN-US/comm-central');
-
-
-//$data['mc'] = $moz_central->getCommits();
-$data['cc'] = $comm_central->getCommits();
-
-$sorted_timestamps = [];
-$dirs_reference = [
-    'browser', 'calendar', 'chat', 'devtools', 'dom', 'editor',
-    'extensions', 'mail', 'mobile', 'netwerk', 'other-licenses',
-    'security', 'services', 'suite', 'toolkit', 'webapprt'
-];
-
-$ext_reference = [
-    'dtd', 'properties', 'ini', 'inc'
-];
-
 function sortByTimestamp($target, $commits, $name) {
     foreach ($commits as $commit) {
         $timestamp = $commit['date']->getTimestamp();
@@ -47,10 +26,74 @@ function sortByTimestamp($target, $commits, $name) {
     return $target;
 }
 
+function linkBugstoBugzilla($string) {
+    $bugs = [];
+    $link = preg_match_all("/Bug ?([0-9]+)\b/i", $string, $bugs);
+
+    $n = 0;
+    foreach ($bugs[0] as $bug_as_string) {
+        $bz_link = 'https://bugzil.la/' . $bugs[1][$n];
+        $string = str_replace($bug_as_string, $bz_link, $string);
+        $n++;
+    }
+
+    return $string;
+}
+
+$target_repo = GIT . 'en-US';
+$git = new DataManager($target_repo);
+
+$moz_central  = new Mercurial(HG . 'TRUNK_EN-US/mozilla-central');
+$comm_central = new Mercurial(HG . 'TRUNK_EN-US/comm-central');
+$moz_central_short_name = 'moz-central';
+$comm_central_short_name = 'comm-central';
+
+//$data['mc'] = $moz_central->getCommits();
+$data['cc'] = $comm_central->getCommits();
+
+$sorted_timestamps = [];
+/*$dirs_reference = [
+    'browser', 'calendar', 'chat', 'devtools', 'dom', 'editor',
+    'extensions', 'mail', 'mobile', 'netwerk', 'other-licenses',
+    'security', 'services', 'suite', 'toolkit', 'webapprt'
+];*/
+
+$moz_central_dirs = [
+    'browser/locales/en-US',
+    'devtools/client/locales/en-US',
+    'devtools/shared/locales/en-US',
+    'dom/locales/en-US',
+    'embedding/browser/chrome/locale/en-US',
+    'mobile/android/locales/en-US',
+    'mobile/locales/en-US',
+    'netwerk/locales/en-US',
+    'other-licenses/branding/firefox/locales',
+    'security/manager/locales/en-US',
+    'services/sync/locales/en-US',
+    'toolkit/locales/en-US',
+    'webapprt/locales/en-US'
+];
+// If we want to include en-US dic history: extensions/spellcheck/locales/en-US
+
+$comm_central_dirs = [
+    'calendar/locales/en-US',
+    'chat/locales/en-US',
+    'editor/ui/locales/en-US',
+    'mail/branding/nightly/locales/en-US',
+    'mail/locales/en-US',
+    'suite/locales/en-US',
+    'other-licenses/branding/thunderbird/locales/en-US',
+    'other-licenses/branding/sunbird/locales/en-US'
+];
+
+$ext_reference = [
+    'dtd', 'properties', 'ini', 'inc'
+];
+
 $sorted_timestamps = sortByTimestamp($sorted_timestamps, $data['cc'], 'cc');
 unset($data['cc']);
 //$sorted_timestamps = sortByTimestamp($sorted_timestamps, $data['mc'], 'mc');
-unset($data['mc']);
+//unset($data['mc']);
 
 ksort($sorted_timestamps);
 
@@ -61,23 +104,27 @@ foreach ($sorted_timestamps as $commit) {
     switch($commit['repo']) {
         case 'cc':
             $vcs = $comm_central;
-            $web_link = 'comm-central';
+            $web_link = $comm_central_short_name;
+            $origin = 'Comm Central';
+            $repo_dirs = $comm_central_dirs;
             break;
         case 'mc':
             $vcs = $moz_central;
-            $web_link = 'mozilla-central';
+            $web_link = $moz_central_short_name;
+            $origin = 'Mozilla Central';
+            $repo_dirs = $moz_central_dirs;
             break;
     }
     $changes = $vcs->getChangedFiles($rev);
 
     foreach ($changes as $change) {
-        if (! Strings::startsWith($change['path'], $dirs_reference)
+        if (! Strings::startsWith($change['path'], $repo_dirs)
          || ! Strings::endsWith($change['path'], $ext_reference)) {
             continue;
         }
 
-        $vcs->revertFile($rev, $change['path']);
         $l10n_has_changed = true;
+        $vcs->revertFile($rev, $change['path']);
 
         $target_path = $target_repo . '/' . $change['path'];
 
@@ -95,11 +142,18 @@ foreach ($sorted_timestamps as $commit) {
         }
     }
 
-    // If this commit has l10n changes, record it
-    if ($l10n_has_changed) {
-        $message = $commit['summary'] . "\nhttps://hg.mozilla.org/{$web_link}/rev/{$rev}";
+    /*
+        If this commit has l10n files listed in its changed files and actually
+        changed those files, record it
+    */
+    if ($l10n_has_changed && ! empty($git->status())) {
+        $commit['summary'] = linkBugstoBugzilla($commit['summary']);
+        $message = $commit['summary'] . "\n\nDiff on {$origin}: https://hg.mozilla.org/{$web_link}/rev/{$rev}";
         $author = $commit['author'] . ' <' . $commit['email'] . '>';
         $date = $commit['date']->format('D M j H:i:s Y O');
         $git->commit($message, $author, $date);
     }
 }
+
+//file_put_contents(CONFIG . 'latest_' . $moz_central_short_name . '.txt', );
+//file_put_contents(CONFIG . 'latest_' . $comm_central_short_name . '.txt', );
