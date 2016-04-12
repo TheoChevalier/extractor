@@ -45,7 +45,7 @@ $git = new DataManager($target_repo);
 
 $moz_central  = new Mercurial(HG . 'TRUNK_EN-US/mozilla-central');
 $comm_central = new Mercurial(HG . 'TRUNK_EN-US/comm-central');
-$moz_central_short_name = 'moz-central';
+$moz_central_short_name = 'mozilla-central';
 $comm_central_short_name = 'comm-central';
 
 $data['mc'] = $moz_central->getCommits();
@@ -114,11 +114,16 @@ foreach ($sorted_timestamps as $commit) {
             break;
     }
     $changes = $vcs->getChangedFiles($rev);
-
+    $first_change = true;
     foreach ($changes as $change) {
         // Quick check to eliminate files outside l10n directories
         if (! Strings::startsWith($change['path'], array_keys($repo_dirs))) {
             continue;
+        }
+        if ($first_change) {
+            // Checkout the repo to the current revision
+            $first_change = false;
+            $vcs->revertFile($rev);
         }
         $l10n_has_changed = true;
 
@@ -133,9 +138,6 @@ foreach ($sorted_timestamps as $commit) {
         // Build target path by switching dirs and adding target repo
         $target_path = str_replace($source_dir, $target_dir, $change['path']);
         $target_path = $target_repo . '/' . $target_path;
-
-        // Revert the hg file to the current revision
-        $vcs->revertFile($rev, $change['path']);
 
         switch($change['type']) {
             case 'A':
