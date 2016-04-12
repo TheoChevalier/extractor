@@ -28,7 +28,7 @@ function sortByTimestamp($target, $commits, $name) {
 
 function linkBugstoBugzilla($string) {
     $bugs = [];
-    $link = preg_match_all("/Bug ?([0-9]+)\b/i", $string, $bugs);
+    preg_match_all("/Bug ?([0-9]+)\b/i", $string, $bugs);
 
     $n = 0;
     foreach ($bugs[0] as $bug_as_string) {
@@ -48,7 +48,7 @@ $comm_central = new Mercurial(HG . 'TRUNK_EN-US/comm-central');
 $moz_central_short_name = 'moz-central';
 $comm_central_short_name = 'comm-central';
 
-//$data['mc'] = $moz_central->getCommits();
+$data['mc'] = $moz_central->getCommits();
 $data['cc'] = $comm_central->getCommits();
 
 $sorted_timestamps = [];
@@ -87,14 +87,14 @@ $comm_central_dirs = [
     'other-licenses/branding/sunbird/locales/en-US'     => 'other-licenses/branding/sunbird',
     'suite/locales/en-US'                               => 'suite'
 ];
-
+print ('##### Got history');
 $sorted_timestamps = sortByTimestamp($sorted_timestamps, $data['cc'], 'cc');
 unset($data['cc']);
-//$sorted_timestamps = sortByTimestamp($sorted_timestamps, $data['mc'], 'mc');
-//unset($data['mc']);
+$sorted_timestamps = sortByTimestamp($sorted_timestamps, $data['mc'], 'mc');
+unset($data['mc']);
 
 ksort($sorted_timestamps);
-
+print ('##### History sorted!');
 foreach ($sorted_timestamps as $commit) {
     $l10n_has_changed = false;
     $rev = explode(':', $commit['commit'])[1];
