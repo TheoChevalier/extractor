@@ -59,35 +59,33 @@ $sorted_timestamps = [];
 ];*/
 
 $moz_central_dirs = [
-    'browser/locales/en-US',
-    'devtools/client/locales/en-US',
-    'devtools/shared/locales/en-US',
-    'dom/locales/en-US',
-    'embedding/browser/chrome/locale/en-US',
-    'mobile/android/locales/en-US',
-    'mobile/locales/en-US',
-    'netwerk/locales/en-US',
-    'other-licenses/branding/firefox/locales',
-    'security/manager/locales/en-US',
-    'services/sync/locales/en-US',
-    'toolkit/locales/en-US',
-    'webapprt/locales/en-US'
+    'browser/branding/official/locales/en-US' => 'browser/branding/official',
+    'browser/locales/en-US'                   => 'browser',
+    'browser/extensions/pocket/locales/en-US' => 'browser/extensions/pocket',
+    'devtools/client/locales/en-US'           => 'devtools/client',
+    'devtools/shared/locales/en-US'           => 'devtools/shared',
+    'dom/locales/en-US'                       => 'dom',
+    'embedding/android/locales/en-US'         => 'embedding/android',
+    'mobile/android/base/locales/en-US'       => 'mobile/android/base',
+    'mobile/android/locales/en-US/chrome'     => 'mobile/android/chrome',
+    'mobile/locales/en-US'                    => 'mobile',
+    'netwerk/locales/en-US'                   => 'netwerk',
+    'security/manager/locales/en-US/chrome'   => 'security/manager/chrome',
+    'services/sync/locales/en-US'             => 'services/sync',
+    'toolkit/locales/en-US'                   => 'toolkit',
+    'webapprt/locales/en-US'                  => 'webapprt'
 ];
 // If we want to include en-US dic history: extensions/spellcheck/locales/en-US
+// Not sure we want to handle that… (from CVS, removed in sept 2008) http://hg.mozilla.org/mozilla-central/file/9b2a99adc05e/embedding/browser/chrome/locale/en-US
 
 $comm_central_dirs = [
-    'calendar/locales/en-US',
-    'chat/locales/en-US',
-    'editor/ui/locales/en-US',
-    'mail/branding/nightly/locales/en-US',
-    'mail/locales/en-US',
-    'suite/locales/en-US',
-    'other-licenses/branding/thunderbird/locales/en-US',
-    'other-licenses/branding/sunbird/locales/en-US'
-];
-
-$ext_reference = [
-    'dtd', 'properties', 'ini', 'inc'
+    'calendar/locales/en-US'                            => 'calendar',
+    'chat/locales/en-US'                                => 'chat',
+    'editor/ui/locales/en-US/chrome'                    => 'editor/ui/chrome',
+    'mail/locales/en-US'                                => 'mail',
+    'other-licenses/branding/thunderbird/locales/en-US' => 'other-licenses/branding/thunderbird',
+    'other-licenses/branding/sunbird/locales/en-US'     => 'other-licenses/branding/sunbird',
+    'suite/locales/en-US'                               => 'suite'
 ];
 
 $sorted_timestamps = sortByTimestamp($sorted_timestamps, $data['cc'], 'cc');
@@ -118,15 +116,26 @@ foreach ($sorted_timestamps as $commit) {
     $changes = $vcs->getChangedFiles($rev);
 
     foreach ($changes as $change) {
-        if (! Strings::startsWith($change['path'], $repo_dirs)
-         || ! Strings::endsWith($change['path'], $ext_reference)) {
+        // Quick check to eliminate files outside l10n directories
+        if (! Strings::startsWith($change['path'], array_keys($repo_dirs))) {
             continue;
         }
-
         $l10n_has_changed = true;
-        $vcs->revertFile($rev, $change['path']);
 
-        $target_path = $target_repo . '/' . $change['path'];
+        // Get from which source directory the file is coming
+        foreach ($repo_dirs as $source => $target) {
+            if (Strings::startsWith($change['path'], $source)) {
+                $source_dir = $source;
+                $target_dir = $target;
+            }
+        }
+
+        // Build target path by switching dirs and adding target repo
+        $target_path = str_replace($source_dir, $target_dir, $change['path']);
+        $target_path = $target_repo . '/' . $target_path;
+
+        // Revert the hg file to the current revision
+        $vcs->revertFile($rev, $change['path']);
 
         switch($change['type']) {
             case 'A':
