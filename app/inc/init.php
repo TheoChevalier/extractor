@@ -22,9 +22,6 @@ require_once __DIR__ . '/constants.php';
 // Autoloading of classes (both /vendor and /classes)
 require_once INSTALL_ROOT . 'vendor/autoload.php';
 
-// Load all global variables for the application
-require_once __DIR__ . '/variables.php';
-
 // For debugging
 if (DEBUG) {
     error_reporting(E_ALL);

@@ -40,24 +40,6 @@ function linkBugstoBugzilla($string) {
     return $string;
 }
 
-$target_repo = GIT . 'en-US';
-$git = new DataManager($target_repo);
-
-$moz_central  = new Mercurial(HG . 'TRUNK_EN-US/mozilla-central');
-$comm_central = new Mercurial(HG . 'TRUNK_EN-US/comm-central');
-$moz_central_short_name = 'mozilla-central';
-$comm_central_short_name = 'comm-central';
-
-$data['mc'] = $moz_central->getCommits();
-$data['cc'] = $comm_central->getCommits();
-
-$sorted_timestamps = [];
-/*$dirs_reference = [
-    'browser', 'calendar', 'chat', 'devtools', 'dom', 'editor',
-    'extensions', 'mail', 'mobile', 'netwerk', 'other-licenses',
-    'security', 'services', 'suite', 'toolkit', 'webapprt'
-];*/
-
 $moz_central_dirs = [
     'browser/branding/official/locales/en-US' => 'browser/branding/official',
     'browser/locales/en-US'                   => 'browser',
@@ -87,11 +69,41 @@ $comm_central_dirs = [
     'other-licenses/branding/sunbird/locales/en-US'     => 'other-licenses/branding/sunbird',
     'suite/locales/en-US'                               => 'suite'
 ];
+
+
+$target_repo = GIT . 'en-US';
+$git = new DataManager($target_repo);
+
+$moz_central = new HgRepo(HG . 'TRUNK_EN-US/mozilla-central');
+$moz_central->short_name  = 'mozilla-central';
+$moz_central->web_link    = 'mozilla-central';
+$moz_central->origin      = 'Mozilla Central';
+$moz_central->repo_dirs   = $moz_central_dirs;
+$moz_central->save_latest = CACHE_PATH . 'latest_' . $moz_central->short_name . '.txt';
+
+$comm_central = new HgRepo(HG . 'TRUNK_EN-US/comm-central');
+$comm_central->short_name  = 'comm-central';
+$comm_central->web_link    = 'comm-central';
+$comm_central->origin      = 'Comm Central';
+$comm_central->repo_dirs   = $comm_central_dirs;
+$comm_central->save_latest = CACHE_PATH . 'latest_' . $comm_central->short_name . '.txt';
+
+
+$moz_central->getHistory();
+$comm_central->getHistory();
+
 print ('##### Got history');
-$sorted_timestamps = sortByTimestamp($sorted_timestamps, $data['cc'], 'cc');
-unset($data['cc']);
-$sorted_timestamps = sortByTimestamp($sorted_timestamps, $data['mc'], 'mc');
-unset($data['mc']);
+
+$sorted_timestamps = [];
+
+if (! empty($comm_central->data)) {
+    $sorted_timestamps = sortByTimestamp($sorted_timestamps, $comm_central->data, $comm_central->short_name);
+    $comm_central->data = [];
+}
+if (! empty($moz_central->data)) {
+    $sorted_timestamps = sortByTimestamp($sorted_timestamps, $moz_central->data, $moz_central->short_name);
+    $moz_central->data = [];
+}
 
 ksort($sorted_timestamps);
 print ('##### History sorted!');
@@ -99,36 +111,29 @@ foreach ($sorted_timestamps as $commit) {
     $l10n_has_changed = false;
     $rev = explode(':', $commit['commit'])[1];
 
-    switch($commit['repo']) {
-        case 'cc':
-            $vcs = $comm_central;
-            $web_link = $comm_central_short_name;
-            $origin = 'Comm Central';
-            $repo_dirs = $comm_central_dirs;
-            break;
-        case 'mc':
-            $vcs = $moz_central;
-            $web_link = $moz_central_short_name;
-            $origin = 'Mozilla Central';
-            $repo_dirs = $moz_central_dirs;
-            break;
+    $vcs = $moz_central;
+    if ($commit['repo'] == $comm_central->short_name) {
+        $vcs = $comm_central;
     }
+
+    $vcs->rev = $rev;
     $changes = $vcs->getChangedFiles($rev);
     $first_change = true;
     foreach ($changes as $change) {
         // Quick check to eliminate files outside l10n directories
-        if (! Strings::startsWith($change['path'], array_keys($repo_dirs))) {
+        if (! Strings::startsWith($change['path'], array_keys($vcs->repo_dirs))) {
             continue;
         }
+
         if ($first_change) {
             // Checkout the repo to the current revision
             $first_change = false;
-            $vcs->revertFile($rev);
+            $vcs->revertRepo($rev);
         }
         $l10n_has_changed = true;
 
         // Get from which source directory the file is coming
-        foreach ($repo_dirs as $source => $target) {
+        foreach ($vcs->repo_dirs as $source => $target) {
             if (Strings::startsWith($change['path'], $source)) {
                 $source_dir = $source;
                 $target_dir = $target;
@@ -139,6 +144,7 @@ foreach ($sorted_timestamps as $commit) {
         $target_path = str_replace($source_dir, $target_dir, $change['path']);
         $target_path = $target_repo . '/' . $target_path;
 
+        // Check the type of change and copy / delete the file to/from target repo
         switch($change['type']) {
             case 'A':
             case 'M':
@@ -148,7 +154,13 @@ foreach ($sorted_timestamps as $commit) {
                 );
                 break;
             case 'R':
-                unlink($target_path);
+                /*
+                    Remove the file only if it exists (merges are listing
+                    already deleted files)
+                */
+                if (is_file($target_path)) {
+                    unlink($target_path);
+                }
                 break;
         }
     }
@@ -159,12 +171,16 @@ foreach ($sorted_timestamps as $commit) {
     */
     if ($l10n_has_changed && ! empty($git->status())) {
         $commit['summary'] = linkBugstoBugzilla($commit['summary']);
-        $message = $commit['summary'] . "\n\nDiff on {$origin}: https://hg.mozilla.org/{$web_link}/rev/{$rev}";
-        $author = $commit['author'] . ' <' . $commit['email'] . '>';
-        $date = $commit['date']->format('D M j H:i:s Y O');
+        $message = $commit['summary'] . "\n\nDiff on {$vcs->origin}: https://hg.mozilla.org/{$vcs->web_link}/rev/{$rev}";
+        $author  = $commit['author'] . ' <' . $commit['email'] . '>';
+        $date    = $commit['date']->format('D M j H:i:s Y O');
         $git->commit($message, $author, $date);
     }
 }
 
-//file_put_contents(CONFIG . 'latest_' . $moz_central_short_name . '.txt', );
-//file_put_contents(CONFIG . 'latest_' . $comm_central_short_name . '.txt', );
+if (isset($moz_central->rev)) {
+    file_put_contents($moz_central->save_latest, $moz_central->rev);
+}
+if (isset($comm_central->rev)) {
+    file_put_contents($comm_central->save_latest, $comm_central->rev);
+}

@@ -18,7 +18,7 @@
         "monolog/monolog" : "~1.1",
         "mozillal10n/cache": "~0.1",
         "mozillal10n/json": "~0.1",
-        "pascalc/vcs": "~0.1",
+        "pascalc/vcs": "dev-master",
         "robloach/component-installer": "*",
         "bit3/git-php": "~1",
         "knplabs/github-api": "~1.2"
