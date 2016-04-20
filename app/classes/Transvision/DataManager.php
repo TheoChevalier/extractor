@@ -44,6 +44,16 @@ class DataManager extends \VCS\Git
         }
     }
 
+    public function tag($tag)
+    {
+        try {
+            $this->git->tag()->execute($tag);
+        } catch (GitException $e) {
+            $this->logger->error('Failed tagging Git repository. Error: '
+                                 . $e->getMessage());
+        }
+    }
+
     public function status()
     {
         try {

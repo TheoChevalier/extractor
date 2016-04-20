@@ -51,6 +51,8 @@ if (isset($argv[1])) {
 include __DIR__ . '/../inc/init.php';
 include 'config/config_' . $argv[1] . '.php';
 
+$tag_products = ['FIREFOX', 'FENNEC', 'THUNDERBIRD', 'SEAMONKEY'];
+
 // Init target Git repo for storage
 if (! is_dir($target_repo)) {
     mkdir($target_repo);
@@ -61,10 +63,9 @@ $git = new DataManager($target_repo);
 $moz_repo->getHistory();
 $comm_repo->getHistory();
 
-print ('##### Got history');
+print ("Got history\n");
 
 $sorted_timestamps = [];
-
 if (! empty($comm_repo->data)) {
     $sorted_timestamps = sortByTimestamp($sorted_timestamps, $comm_repo->data, $comm_repo->short_name);
     $comm_repo->data = [];
@@ -73,9 +74,10 @@ if (! empty($moz_repo->data)) {
     $sorted_timestamps = sortByTimestamp($sorted_timestamps, $moz_repo->data, $moz_repo->short_name);
     $moz_repo->data = [];
 }
-
 ksort($sorted_timestamps);
-print ('##### History sorted!');
+
+print ("Start committing\n");
+
 foreach ($sorted_timestamps as $commit) {
     $l10n_has_changed = false;
     $rev = explode(':', $commit['commit'])[1];
@@ -134,6 +136,20 @@ foreach ($sorted_timestamps as $commit) {
         }
     }
 
+    // Skip tags on comm-* repos
+    if ($vcs->short_name == $moz_repo->short_name) {
+        foreach ($commit['tags'] as $tag) {
+            $exploded_tag = explode('_', $tag);
+
+            // Only keep tags for major releases
+            if (in_array($exploded_tag[0], $tag_products) && $exploded_tag[2] == '0' && $exploded_tag[3] == 'RELEASE') {
+                // TODO: Handle special case of SeaMonkey version number
+                $git->tag($tag);
+            }
+
+        }
+    }
+
     /*
         If this commit has l10n files listed in its changed files and actually
         changed those files, record it
@@ -148,7 +164,7 @@ foreach ($sorted_timestamps as $commit) {
 }
 
 if (isset($moz_repo->rev)) {
-    file_put_contents($moz_repo->save_latest, $moz_repo->rev);
+    //file_put_contents($moz_repo->save_latest, $moz_repo->rev);
 }
 if (isset($comm_repo->rev)) {
     file_put_contents($comm_repo->save_latest, $comm_repo->rev);
