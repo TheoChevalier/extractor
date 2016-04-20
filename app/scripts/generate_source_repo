@@ -2,26 +2,6 @@
 <?php
 namespace Transvision;
 
-if (php_sapi_name() != 'cli') {
-    die('This command can only be used in CLI mode.');
-}
-
-if (count($argv) < 1) {
-    die("This command needs more parameters, please check generate_source_repo --help.\n");
-}
-if (isset($argv[1])) {
-    if (in_array($argv[1], ['-h', '--help'])) {
-        $command_help = "generate_sources_repo - Creates repo with source strings only\n" .
-                "Usage: generate_sources_repo [channel_name]\n\n" .
-                "Example: generate_sources beta\n" .
-                "Accepted values: central, aurora, beta, release\n";
-        die($command_help);
-    }
-}
-
-include __DIR__ . '/../inc/init.php';
-include 'config/config_' . $argv[1] . '.php';
-
 function sortByTimestamp($target, $commits, $name) {
     foreach ($commits as $commit) {
         $timestamp = $commit['date']->getTimestamp();
@@ -33,6 +13,7 @@ function sortByTimestamp($target, $commits, $name) {
         $commit['repo'] = $name;
         $target[$timestamp] = $commit;
     }
+
     return $target;
 }
 
@@ -49,6 +30,26 @@ function linkBugstoBugzilla($string) {
 
     return $string;
 }
+
+if (php_sapi_name() != 'cli') {
+    die('This command can only be used in CLI mode.');
+}
+
+if (count($argv) < 2) {
+    die("This command needs more parameters, please check generate_source_repo --help.\n");
+}
+if (isset($argv[1])) {
+    if (in_array($argv[1], ['-h', '--help'])) {
+        $command_help = "generate_sources_repo - Creates repo with source strings only\n" .
+                "Usage: generate_sources_repo [channel_name]\n\n" .
+                "Example: generate_sources beta\n" .
+                "Accepted values: central, aurora, beta, release\n";
+        die($command_help);
+    }
+}
+
+include __DIR__ . '/../inc/init.php';
+include 'config/config_' . $argv[1] . '.php';
 
 // Init target Git repo for storage
 if (! is_dir($target_repo)) {

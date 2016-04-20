@@ -1,5 +1,4 @@
 <?php
-
 namespace Transvision;
 
 $moz_repo_dirs = [
@@ -17,7 +16,7 @@ $moz_repo_dirs = [
     'security/manager/locales/en-US/chrome'   => 'security/manager/chrome',
     'services/sync/locales/en-US'             => 'services/sync',
     'toolkit/locales/en-US'                   => 'toolkit',
-    'webapprt/locales/en-US'                  => 'webapprt'
+    'webapprt/locales/en-US'                  => 'webapprt',
 ];
 // If we want to include en-US dic history: extensions/spellcheck/locales/en-US
 // Not sure we want to handle that… (from CVS, removed in sept 2008) http://hg.mozilla.org/mozilla-central/file/9b2a99adc05e/embedding/browser/chrome/locale/en-US
@@ -29,7 +28,7 @@ $comm_repo_dirs = [
     'mail/locales/en-US'                                => 'mail',
     'other-licenses/branding/thunderbird/locales/en-US' => 'other-licenses/branding/thunderbird',
     'other-licenses/branding/sunbird/locales/en-US'     => 'other-licenses/branding/sunbird',
-    'suite/locales/en-US'                               => 'suite'
+    'suite/locales/en-US'                               => 'suite',
 ];
 
 $target_repo = GIT . 'en-US-aurora';
