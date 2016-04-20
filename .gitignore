@@ -4,6 +4,7 @@ app/config/sources/*.json
 app/config/sources/*.txt
 cache/*.cache
 cache/lastdataupdate.txt
+cache/latest_*.txt
 cache/stats_*.json
 cache/version.txt
 composer.lock
