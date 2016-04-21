@@ -31,7 +31,7 @@ $comm_repo_dirs = [
     'suite/locales/en-US'                               => 'suite',
 ];
 
-$target_repo = GIT . 'en-US-central';
+$target_repo = 'en-US-central';
 $moz_repo = new HgRepo(HG . 'TRUNK_EN-US/mozilla-central');
 $moz_repo->short_name  = 'mozilla-central';
 $moz_repo->web_link    = 'mozilla-central';

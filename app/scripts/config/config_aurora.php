@@ -31,7 +31,7 @@ $comm_repo_dirs = [
     'suite/locales/en-US'                               => 'suite',
 ];
 
-$target_repo = GIT . 'en-US-aurora';
+$target_repo = 'en-US-aurora';
 $moz_repo = new HgRepo(HG . 'AURORA_EN-US/mozilla-aurora');
 $moz_repo->short_name  = 'mozilla-aurora';
 $moz_repo->web_link    = 'releases/mozilla-aurora';

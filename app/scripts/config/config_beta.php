@@ -31,7 +31,7 @@ $comm_repo_dirs = [
     'suite/locales/en-US'                               => 'suite',
 ];
 
-$target_repo = GIT . 'en-US-beta';
+$target_repo = 'en-US-beta';
 $moz_repo = new HgRepo(HG . 'BETA_EN-US/mozilla-beta');
 $moz_repo->short_name  = 'mozilla-beta';
 $moz_repo->web_link    = 'releases/mozilla-beta';

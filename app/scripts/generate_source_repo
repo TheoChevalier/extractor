@@ -54,10 +54,11 @@ include 'config/config_' . $argv[1] . '.php';
 $tag_products = ['FIREFOX', 'FENNEC', 'THUNDERBIRD', 'SEAMONKEY'];
 
 // Init target Git repo for storage
-if (! is_dir($target_repo)) {
-    mkdir($target_repo);
+$target_repo_path = GIT . $target_repo;
+if (! is_dir($target_repo_path)) {
+    mkdir($target_repo_path);
 }
-$git = new DataManager($target_repo);
+$git = new DataManager($target_repo_path, $target_repo);
 
 // Store hg history in each HgRepo object
 $moz_repo->getHistory();
@@ -113,7 +114,7 @@ foreach ($sorted_timestamps as $commit) {
 
         // Build target path by switching dirs and adding target repo
         $target_path = str_replace($source_dir, $target_dir, $change['path']);
-        $target_path = $target_repo . '/' . $target_path;
+        $target_path = $target_repo_path . '/' . $target_path;
 
         // Check the type of change and copy / delete the file to/from target repo
         switch($change['type']) {
@@ -146,7 +147,6 @@ foreach ($sorted_timestamps as $commit) {
                 // TODO: Handle special case of SeaMonkey version number
                 $git->tag($tag);
             }
-
         }
     }
 
@@ -163,8 +163,10 @@ foreach ($sorted_timestamps as $commit) {
     }
 }
 
+$git->push();
+
 if (isset($moz_repo->rev)) {
-    //file_put_contents($moz_repo->save_latest, $moz_repo->rev);
+    file_put_contents($moz_repo->save_latest, $moz_repo->rev);
 }
 if (isset($comm_repo->rev)) {
     file_put_contents($comm_repo->save_latest, $comm_repo->rev);

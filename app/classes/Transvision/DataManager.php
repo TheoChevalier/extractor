@@ -12,9 +12,20 @@ use Monolog\Logger;
  */
 class DataManager extends \VCS\Git
 {
-    public function __construct($path)
+    private $name;
+    private $username;
+    private $token;
+    private $remote_url;
+
+    public function __construct($path, $name)
     {
         parent::__construct($path);
+
+        $this->username   = urlencode(GITHUB_USER);
+        $this->token      = urlencode(GITHUB_TOKEN);
+        $this->name       = $name;
+        $this->remote_url = "https://{$this->username}:{$this->token}@github.com/{$this->username}/{$this->name}.git";
+
         // We use the Monolog library to log our events
         $this->logger = new Logger('DataManager');
         $this->logger->pushHandler(new StreamHandler(INSTALL_ROOT . 'logs/repo-errors.log'));
@@ -50,6 +61,16 @@ class DataManager extends \VCS\Git
             $this->git->tag()->execute($tag);
         } catch (GitException $e) {
             $this->logger->error('Failed tagging Git repository. Error: '
+                                 . $e->getMessage());
+        }
+    }
+
+    public function push()
+    {
+        try {
+            $this->git->push()->execute($this->remote_url, 'master');
+        } catch (GitException $e) {
+            $this->logger->error('Failed to push to Git repository. Error: '
                                  . $e->getMessage());
         }
     }
