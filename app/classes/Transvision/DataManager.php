@@ -68,7 +68,7 @@ class DataManager extends \VCS\Git
     public function push()
     {
         try {
-            $this->git->push()->execute($this->remote_url, 'master');
+            $this->git->push()->followTags()->execute($this->remote_url, 'master');
         } catch (GitException $e) {
             $this->logger->error('Failed to push to Git repository. Error: '
                                  . $e->getMessage());

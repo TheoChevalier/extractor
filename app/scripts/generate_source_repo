@@ -60,6 +60,10 @@ if (! is_dir($target_repo_path)) {
 }
 $git = new DataManager($target_repo_path, $target_repo);
 
+// Update hg repo
+$moz_repo->update();
+$comm_repo->update();
+
 // Store hg history in each HgRepo object
 $moz_repo->getHistory();
 $comm_repo->getHistory();
@@ -159,9 +163,21 @@ foreach ($sorted_timestamps as $commit) {
         $message = $commit['summary'] . "\n\nDiff on {$vcs->origin}: https://hg.mozilla.org/{$vcs->web_link}/rev/{$rev}";
         $author  = $commit['author'] . ' <' . $commit['email'] . '>';
         $date    = $commit['date']->format('D M j H:i:s Y O');
+
+        $cwd = getcwd();
+        chdir($git->repository_path);
+        shell_exec("git config user.name \"{$commit['author']}\"");
+        shell_exec("git config user.email \"{$commit['email']}\"");
+        chdir($cwd);
+
         $git->commit($message, $author, $date);
     }
 }
+
+$cwd = getcwd();
+chdir($git->repository_path);
+shell_exec("{$cwd}/app/scripts/update_committer_date.sh");
+chdir($cwd);
 
 $git->push();
 
