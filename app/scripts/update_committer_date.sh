@@ -9,5 +9,5 @@ git filter-branch --env-filter '
 ' --tag-name-filter cat -- --branches --tags
 rm -rf ./.git/refs/original
 
-#    export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
-#    export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+#    GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+#    GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"

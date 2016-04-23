@@ -23,6 +23,7 @@ class HgRepo extends \VCS\Mercurial
     {
         if (is_file($this->save_latest) && ! empty(file_get_contents($this->save_latest))) {
             $latest = file_get_contents($this->save_latest);
+            $latest = preg_replace( "/\r|\n/", "", $latest);
 
             $this->data = $this->getCommitsSince($latest);
 
