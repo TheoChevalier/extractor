@@ -52,6 +52,7 @@ include __DIR__ . '/../inc/init.php';
 include 'config/config_' . $argv[1] . '.php';
 
 $tag_products = ['FIREFOX', 'FENNEC', 'THUNDERBIRD', 'SEAMONKEY'];
+$got_commits = false;
 
 // Init target Git repo for storage
 $target_repo_path = GIT . $target_repo;
@@ -81,7 +82,7 @@ if (! empty($moz_repo->data)) {
 }
 ksort($sorted_timestamps);
 
-print ("Start committing\n");
+print ('Start processing ' . count($sorted_timestamps) . " commits\n");
 
 foreach ($sorted_timestamps as $commit) {
     $l10n_has_changed = false;
@@ -171,19 +172,22 @@ foreach ($sorted_timestamps as $commit) {
         chdir($cwd);
 
         $git->commit($message, $author, $date);
+        $got_commits = true;
     }
 }
 
-$cwd = getcwd();
-chdir($git->repository_path);
-shell_exec("{$cwd}/app/scripts/update_committer_date.sh");
-chdir($cwd);
+if ($got_commits) {
+    $cwd = getcwd();
+    chdir($git->repository_path);
+    shell_exec("{$cwd}/app/scripts/update_committer_date.sh");
+    chdir($cwd);
 
-$git->push();
+    $git->push();
 
-if (isset($moz_repo->rev)) {
-    file_put_contents($moz_repo->save_latest, $moz_repo->rev);
-}
-if (isset($comm_repo->rev)) {
-    file_put_contents($comm_repo->save_latest, $comm_repo->rev);
+    if (isset($moz_repo->rev)) {
+        file_put_contents($moz_repo->save_latest, $moz_repo->rev);
+    }
+    if (isset($comm_repo->rev)) {
+        file_put_contents($comm_repo->save_latest, $comm_repo->rev);
+    }
 }
