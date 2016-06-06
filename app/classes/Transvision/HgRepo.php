@@ -33,7 +33,7 @@ class HgRepo extends \VCS\Mercurial
             // Get the oldest commit first
             $this->data = array_reverse($temp);
         } else {
-            $this->data = array_reverse($this->getCommitsWithoutMerges());
+            $this->data = $this->getCommitsWithoutMerges();
         }
     }
 
