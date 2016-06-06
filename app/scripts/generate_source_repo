@@ -2,19 +2,110 @@
 <?php
 namespace Transvision;
 
-function sortByTimestamp($target, $commits, $name) {
-    foreach ($commits as $commit) {
-        $timestamp = $commit['date']->getTimestamp();
+function processHistory($vcs, $git) {
+    $tag_products = ['FIREFOX', 'FENNEC', 'THUNDERBIRD', 'SEAMONKEY'];
+    $got_commits = false;
 
-        // Handle edge case where two pushes occured at very same timestamp
-        while(isset($target[$timestamp])) {
-            $timestamp++;
+    print ('Start processing ' . count($vcs->data) . " commits\n");
+
+    foreach ($vcs->data as $commit) {
+        $l10n_has_changed = false;
+        $first_change = true;
+        $vcs->rev = explode(':', $commit['commit'])[1];
+        $changes = $vcs->getChangedFiles($vcs->rev);
+
+        foreach ($changes as $change) {
+            // Quick check to eliminate files outside l10n directories
+            if (! Strings::startsWith($change['path'], array_keys($vcs->repo_dirs))) {
+                continue;
+            }
+
+            if ($first_change) {
+                // Checkout the repo to the current revision
+                $first_change = false;
+                $vcs->revertRepo($vcs->rev);
+            }
+            $l10n_has_changed = true;
+
+            // Get from which source directory the file is coming
+            foreach ($vcs->repo_dirs as $source => $target) {
+                if (Strings::startsWith($change['path'], $source)) {
+                    $source_dir = $source;
+                    $target_dir = $target;
+                }
+            }
+
+            // Build target path by switching dirs and adding target repo
+            $target_path = str_replace($source_dir, $target_dir, $change['path']);
+            $target_path = $git->repository_path . '/' . $target_path;
+
+            // Check the type of change and copy / delete the file to/from target repo
+            switch($change['type']) {
+                case 'A':
+                case 'M':
+                    Files::fileForceContents(
+                        $target_path,
+                        file_get_contents($vcs->repository_path . '/' . $change['path'])
+                    );
+                    break;
+                case 'R':
+                    /*
+                        Remove the file only if it exists (merges are listing
+                        already deleted files)
+                    */
+                    if (is_file($target_path)) {
+                        unlink($target_path);
+                    }
+                    break;
+            }
         }
-        $commit['repo'] = $name;
-        $target[$timestamp] = $commit;
+
+        // Skip tags on comm-* repos
+        if (Strings::startsWith($vcs->short_name, 'm')) {
+            foreach ($commit['tags'] as $tag) {
+                $exploded_tag = explode('_', $tag);
+
+                // Only keep tags for major releases
+                if (in_array($exploded_tag[0], $tag_products) && $exploded_tag[2] == '0' && $exploded_tag[3] == 'RELEASE') {
+                    // TODO: Handle special case of SeaMonkey version number
+                    $git->tag($tag);
+                }
+            }
+        }
+
+        /*
+            If this commit has l10n files listed in its changed files and actually
+            changed those files, record it
+        */
+        if ($l10n_has_changed && ! empty($git->status())) {
+            $commit['summary'] = linkBugstoBugzilla($commit['summary']);
+            $message = $commit['summary'] . "\n\nDiff on {$vcs->origin}: https://hg.mozilla.org/{$vcs->web_link}/rev/{$vcs->rev}";
+            $author  = $commit['author'] . ' <' . $commit['email'] . '>';
+            $date    = $commit['date']->format('D M j H:i:s Y O');
+
+            $cwd = getcwd();
+            chdir($git->repository_path);
+            shell_exec("git config user.name \"{$commit['author']}\"");
+            shell_exec("git config user.email \"{$commit['email']}\"");
+            chdir($cwd);
+
+            $git->commit($message, $author, $date);
+            $got_commits = true;
+        }
     }
 
-    return $target;
+    if ($got_commits) {
+        $cwd = getcwd();
+        chdir($git->repository_path);
+        shell_exec(APP_ROOT . 'scripts/update_committer_date.sh');
+        chdir($cwd);
+
+        $git->push();
+
+        if (isset($vcs->rev)) {
+            file_put_contents($vcs->save_latest, $vcs->rev);
+        }
+    }
 }
 
 function linkBugstoBugzilla($string) {
@@ -51,9 +142,6 @@ if (isset($argv[1])) {
 include __DIR__ . '/../inc/init.php';
 include 'config/config_' . $argv[1] . '.php';
 
-$tag_products = ['FIREFOX', 'FENNEC', 'THUNDERBIRD', 'SEAMONKEY'];
-$got_commits = false;
-
 // Init target Git repo for storage
 $target_repo_path = GIT . $target_repo;
 if (! is_dir($target_repo_path)) {
@@ -65,129 +153,13 @@ $git = new DataManager($target_repo_path, $target_repo);
 $moz_repo->update();
 $comm_repo->update();
 
-// Store hg history in each HgRepo object
-$moz_repo->getHistory();
+// Process repos sequentially
 $comm_repo->getHistory();
+print ("Got {$comm_repo->short_name} history\n");
+processHistory($comm_repo, $git);
+unset($comm_repo->data);
 
-print ("Got history\n");
-
-$sorted_timestamps = [];
-if (! empty($comm_repo->data)) {
-    $sorted_timestamps = sortByTimestamp($sorted_timestamps, $comm_repo->data, $comm_repo->short_name);
-    $comm_repo->data = [];
-}
-if (! empty($moz_repo->data)) {
-    $sorted_timestamps = sortByTimestamp($sorted_timestamps, $moz_repo->data, $moz_repo->short_name);
-    $moz_repo->data = [];
-}
-ksort($sorted_timestamps);
-
-print ('Start processing ' . count($sorted_timestamps) . " commits\n");
-
-foreach ($sorted_timestamps as $commit) {
-    $l10n_has_changed = false;
-    $rev = explode(':', $commit['commit'])[1];
-
-    $vcs = $moz_repo;
-    if ($commit['repo'] == $comm_repo->short_name) {
-        $vcs = $comm_repo;
-    }
-
-    $vcs->rev = $rev;
-    $changes = $vcs->getChangedFiles($rev);
-    $first_change = true;
-    foreach ($changes as $change) {
-        // Quick check to eliminate files outside l10n directories
-        if (! Strings::startsWith($change['path'], array_keys($vcs->repo_dirs))) {
-            continue;
-        }
-
-        if ($first_change) {
-            // Checkout the repo to the current revision
-            $first_change = false;
-            $vcs->revertRepo($rev);
-        }
-        $l10n_has_changed = true;
-
-        // Get from which source directory the file is coming
-        foreach ($vcs->repo_dirs as $source => $target) {
-            if (Strings::startsWith($change['path'], $source)) {
-                $source_dir = $source;
-                $target_dir = $target;
-            }
-        }
-
-        // Build target path by switching dirs and adding target repo
-        $target_path = str_replace($source_dir, $target_dir, $change['path']);
-        $target_path = $target_repo_path . '/' . $target_path;
-
-        // Check the type of change and copy / delete the file to/from target repo
-        switch($change['type']) {
-            case 'A':
-            case 'M':
-                Files::fileForceContents(
-                    $target_path,
-                    file_get_contents($vcs->repository_path . '/' . $change['path'])
-                );
-                break;
-            case 'R':
-                /*
-                    Remove the file only if it exists (merges are listing
-                    already deleted files)
-                */
-                if (is_file($target_path)) {
-                    unlink($target_path);
-                }
-                break;
-        }
-    }
-
-    // Skip tags on comm-* repos
-    if ($vcs->short_name == $moz_repo->short_name) {
-        foreach ($commit['tags'] as $tag) {
-            $exploded_tag = explode('_', $tag);
-
-            // Only keep tags for major releases
-            if (in_array($exploded_tag[0], $tag_products) && $exploded_tag[2] == '0' && $exploded_tag[3] == 'RELEASE') {
-                // TODO: Handle special case of SeaMonkey version number
-                $git->tag($tag);
-            }
-        }
-    }
-
-    /*
-        If this commit has l10n files listed in its changed files and actually
-        changed those files, record it
-    */
-    if ($l10n_has_changed && ! empty($git->status())) {
-        $commit['summary'] = linkBugstoBugzilla($commit['summary']);
-        $message = $commit['summary'] . "\n\nDiff on {$vcs->origin}: https://hg.mozilla.org/{$vcs->web_link}/rev/{$rev}";
-        $author  = $commit['author'] . ' <' . $commit['email'] . '>';
-        $date    = $commit['date']->format('D M j H:i:s Y O');
-
-        $cwd = getcwd();
-        chdir($git->repository_path);
-        shell_exec("git config user.name \"{$commit['author']}\"");
-        shell_exec("git config user.email \"{$commit['email']}\"");
-        chdir($cwd);
-
-        $git->commit($message, $author, $date);
-        $got_commits = true;
-    }
-}
-
-if ($got_commits) {
-    $cwd = getcwd();
-    chdir($git->repository_path);
-    shell_exec("{$cwd}/app/scripts/update_committer_date.sh");
-    chdir($cwd);
-
-    $git->push();
-
-    if (isset($moz_repo->rev)) {
-        file_put_contents($moz_repo->save_latest, $moz_repo->rev);
-    }
-    if (isset($comm_repo->rev)) {
-        file_put_contents($comm_repo->save_latest, $comm_repo->rev);
-    }
-}
+$moz_repo->getHistory();
+print ("Got {$moz_repo->short_name} history\n");
+processHistory($moz_repo, $git);
+unset($moz_repo->data);
