@@ -25,17 +25,16 @@ class HgRepo extends \VCS\Mercurial
             $latest = file_get_contents($this->save_latest);
             $latest = preg_replace( "/\r|\n/", "", $latest);
 
-            $this->data = $this->getCommitsWithoutMergesSince($latest);
+            $temp = $this->getCommitsWithoutMergesSince($latest);
 
             // Remove the last processed revision
-            array_pop($this->data);
+            array_pop($temp);
 
+            // Get the oldest commit first
+            $this->data = array_reverse($temp);
         } else {
-            $this->data = $this->getCommitsWithoutMerges();
+            $this->data = array_reverse($this->getCommitsWithoutMerges());
         }
-
-        // Get the oldest commit first
-        $this->data = array_reverse($this->data);
     }
 
     public function getCommitsWithoutMerges()
